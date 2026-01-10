@@ -6,3 +6,12 @@ node_modules/
 www/themes/new/css/custom.css
 docker-compose.override.yml
 .idea
+
+# CI/CD & Code Quality Tools
+.phpunit.result.cache
+.php-cs-fixer.cache
+.phpstan.cache
+.phpcs-cache
+vendor/
+composer.lock
+.phpunit.cache/

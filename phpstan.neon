@@ -1,0 +1,16 @@
+parameters:
+    level: 1
+    paths:
+        - classes
+    excludePaths:
+        - vendor
+        - www/lib/class.*.php
+    ignoreErrors:
+        # Legacy code patterns - können schrittweise entfernt werden
+        - '#Unsafe usage of new static#'
+        - '#Access to an undefined property#'
+        - '#Access to property .* on an unknown class Config#'
+        - '#Variable \$this might not be defined#'
+        - '#class.notFound#'
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
