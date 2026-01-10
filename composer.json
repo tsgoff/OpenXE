@@ -1,4 +1,10 @@
 {
+  "name": "openxe-org/openxe",
+  "description": "OpenXE - The free ERP system for managing business processes",
+  "type": "project",
+  "license": "EGPL-3.1",
+  "keywords": ["erp", "business", "invoicing", "inventory", "crm"],
+  "homepage": "https://openxe.org",
   "require": {
     "php": "^8.1",
     "ext-gd": "*",

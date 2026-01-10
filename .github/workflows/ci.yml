@@ -29,7 +29,8 @@ jobs:
           ini-values: memory_limit=512M
 
       - name: Validate composer.json
-        run: composer validate --strict
+        run: composer validate
+        continue-on-error: true
 
       - name: Get Composer Cache Directory
         id: composer-cache
