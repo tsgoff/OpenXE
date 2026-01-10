@@ -5,6 +5,7 @@
 OpenXE ist eine umfassende webbasierte Anwendung zur Abwicklung aller kaufmännischen Prozesse. Zu den Funktionen gehören unter Anderem:
 
 * Erstellung von Angeboten
+* test
 * Auftragsabwicklung
 * Rechnungsstellung
 * Bestellung
