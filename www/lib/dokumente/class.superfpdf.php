@@ -47,6 +47,8 @@ class SuperFPDF extends PDF_EPS {
    *     user space functions
    ***********************************/
   public $addpdf = null;
+  public $filename = '';
+  protected $embeddedFiles = [];
 
   function __construct($orientation='P',$unit='mm',$format='A4',$app=null){
 
@@ -118,7 +120,8 @@ class SuperFPDF extends PDF_EPS {
         }
       }
     }    
-    $result = $this->Output($this->filename,$output);
+    $outFilename = !empty($this->filename) ? $this->filename : 'document.pdf';
+    $result = $this->Output($outFilename,$output);
 
     if($output=="S")
       return $result;
@@ -978,6 +981,158 @@ height: bar height (defaults to 5)
       }
       $xpos += $gap;
     }
+  }
+
+  /**
+   * Attach an embedded file to the PDF (PDF/A-3 compliant for ZUGFeRD / Factur-X / XRechnung)
+   *
+   * @param string $content Raw file content or file path
+   * @param string $filename Target filename inside the PDF container (e.g. xrechnung.xml or factur-x.xml)
+   * @param string $description Human-readable description
+   * @param string $relationship AFRelationship (Alternative, Source, Data)
+   * @param string $mimeType MIME type
+   */
+  public function AttachFile($content, $filename = 'xrechnung.xml', $description = 'ZUGFeRD / XRechnung XML', $relationship = 'Alternative', $mimeType = 'text/xml')
+  {
+    if (file_exists($content) && is_file($content)) {
+      $content = file_get_contents($content);
+    }
+    $this->embeddedFiles[] = [
+      'name' => $filename,
+      'content' => $content,
+      'description' => $description,
+      'relationship' => $relationship,
+      'mimeType' => $mimeType
+    ];
+    $this->PDFVersion = '1.7';
+  }
+
+  /**
+   * Check if the document has files attached
+   *
+   * @return bool
+   */
+  public function HasAttachedFiles()
+  {
+    return !empty($this->embeddedFiles);
+  }
+
+  /**
+   * Output PDF header - ensures PDF 1.7 and binary characters when attachments are present
+   */
+  function _putheader()
+  {
+    if ($this->HasAttachedFiles()) {
+      $this->_out('%PDF-1.7');
+      $this->_out("%\xE2\xE3\xCF\xD3");
+    } else {
+      parent::_putheader();
+    }
+  }
+
+  /**
+   * Output catalog dictionary with PDF/A-3 /AF, /Names, /Metadata, and /OutputIntents
+   */
+  function _putcatalog()
+  {
+    parent::_putcatalog();
+
+    if ($this->HasAttachedFiles()) {
+      $filespecRefs = [];
+      $namesEntries = [];
+
+      foreach ($this->embeddedFiles as $file) {
+        // 1. EmbeddedFile stream object
+        $this->_newobj();
+        $streamId = $this->n;
+        $rawLen = strlen($file['content']);
+        $compressed = gzcompress($file['content']);
+        $filter = '/Filter /FlateDecode ';
+        $length = strlen($compressed);
+        $streamData = $compressed;
+
+        $this->_out("<< /Type /EmbeddedFile /Subtype /text#2Fxml " . $filter . "/Length " . $length . " /Params << /Size " . $rawLen . " >> >>");
+        $this->_putstream($streamData);
+        $this->_out("endobj");
+
+        // 2. Filespec object
+        $this->_newobj();
+        $filespecId = $this->n;
+        $this->_out("<< /Type /Filespec /F (" . $file['name'] . ") /UF (" . $file['name'] . ") /EF << /F " . $streamId . " 0 R >> /AFRelationship /" . $file['relationship'] . " /Desc (" . $file['description'] . ") >>");
+        $this->_out("endobj");
+
+        $filespecRefs[] = $filespecId . ' 0 R';
+        $namesEntries[] = '(' . $file['name'] . ') ' . $filespecId . ' 0 R';
+      }
+
+      // 3. XMP Metadata for PDF/A-3 and ZUGFeRD / Factur-X extension schema
+      $mainFile = $this->embeddedFiles[0]['name'];
+      $xmp = $this->_getZugferdXmpMetadata($mainFile);
+
+      $this->_newobj();
+      $xmpId = $this->n;
+      $this->_out("<< /Type /Metadata /Subtype /XML /Length " . strlen($xmp) . " >>");
+      $this->_putstream($xmp);
+      $this->_out("endobj");
+
+      // 4. OutputIntent (sRGB IEC61966-2.1)
+      $this->_newobj();
+      $outputIntentId = $this->n;
+      $this->_out("<< /Type /OutputIntent /S /GTS_PDFA1 /OutputCondition (sRGB IEC61966-2.1) /OutputConditionIdentifier (sRGB IEC61966-2.1) /RegistryName (http://www.color.org) /Info (sRGB IEC61966-2.1) >>");
+      $this->_out("endobj");
+
+      // Inject into Catalog
+      $this->_out("/AF [ " . implode(" ", $filespecRefs) . " ]");
+      $this->_out("/Names << /EmbeddedFiles << /Names [ " . implode(" ", $namesEntries) . " ] >> >>");
+      $this->_out("/Metadata " . $xmpId . " 0 R");
+      $this->_out("/OutputIntents [ " . $outputIntentId . " 0 R ]");
+    }
+  }
+
+  /**
+   * Build ZUGFeRD / Factur-X / PDF/A-3 XMP metadata
+   *
+   * @param string $filename
+   * @return string
+   */
+  protected function _getZugferdXmpMetadata($filename)
+  {
+    $xmp = "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n" .
+      "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">\n" .
+      " <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" .
+      "  <rdf:Description rdf:about=\"\" xmlns:pdfaid=\"http://www.aiim.org/pdfa/ns/id/\">\n" .
+      "   <pdfaid:part>3</pdfaid:part>\n" .
+      "   <pdfaid:conformance>B</pdfaid:conformance>\n" .
+      "  </rdf:Description>\n" .
+      "  <rdf:Description rdf:about=\"\" xmlns:pdfaExtension=\"http://www.aiim.org/pdfa/ns/extension/\" xmlns:pdfaSchema=\"http://www.aiim.org/pdfa/ns/schema#\" xmlns:pdfaProperty=\"http://www.aiim.org/pdfa/ns/property#\">\n" .
+      "   <pdfaExtension:schemas>\n" .
+      "    <rdf:Bag>\n" .
+      "     <rdf:li rdf:parseType=\"Resource\">\n" .
+      "      <pdfaSchema:schema>Factur-X PDFA Extension Schema</pdfaSchema:schema>\n" .
+      "      <pdfaSchema:namespaceURI>urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#</pdfaSchema:namespaceURI>\n" .
+      "      <pdfaSchema:prefix>fx</pdfaSchema:prefix>\n" .
+      "      <pdfaSchema:property>\n" .
+      "       <rdf:Seq>\n" .
+      "        <rdf:li rdf:parseType=\"Resource\"><pdfaProperty:name>DocumentFileName</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>The name of the embedded XML file</pdfaProperty:description></rdf:li>\n" .
+      "        <rdf:li rdf:parseType=\"Resource\"><pdfaProperty:name>DocumentType</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>INVOICE</pdfaProperty:description></rdf:li>\n" .
+      "        <rdf:li rdf:parseType=\"Resource\"><pdfaProperty:name>Version</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>1.0</pdfaProperty:description></rdf:li>\n" .
+      "        <rdf:li rdf:parseType=\"Resource\"><pdfaProperty:name>ConformanceLevel</pdfaProperty:name><pdfaProperty:valueType>Text</pdfaProperty:valueType><pdfaProperty:category>external</pdfaProperty:category><pdfaProperty:description>EN 16931</pdfaProperty:description></rdf:li>\n" .
+      "       </rdf:Seq>\n" .
+      "      </pdfaSchema:property>\n" .
+      "     </rdf:li>\n" .
+      "    </rdf:Bag>\n" .
+      "   </pdfaExtension:schemas>\n" .
+      "  </rdf:Description>\n" .
+      "  <rdf:Description rdf:about=\"\" xmlns:fx=\"urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#\">\n" .
+      "   <fx:DocumentType>INVOICE</fx:DocumentType>\n" .
+      "   <fx:DocumentFileName>" . htmlspecialchars($filename, ENT_XML1, 'UTF-8') . "</fx:DocumentFileName>\n" .
+      "   <fx:Version>1.0</fx:Version>\n" .
+      "   <fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>\n" .
+      "  </rdf:Description>\n" .
+      " </rdf:RDF>\n" .
+      "</x:xmpmeta>\n" .
+      "<?xpacket end=\"w\"?>";
+    return $xmp;
   }
 
 }

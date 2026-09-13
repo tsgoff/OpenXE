@@ -1413,8 +1413,9 @@ class Rechnung extends GenRechnung
   <body>Kein Smarty Template an der Addresse hinterlegt!</body>
 </note>';
                 $success = false;
-            } else {
-                $template = $this->app->DB->Select("SELECT template from smarty_templates WHERE id = '$template_id' LIMIT 1");
+                $templateRow = $this->app->DB->SelectRow("SELECT name, template from smarty_templates WHERE id = '$template_id' LIMIT 1");
+                $template = $templateRow['template'] ?? '';
+                $template_name = $templateRow['name'] ?? '';
                 $smarty = new Smarty;
                 $directory = $this->app->erp->GetTMP().'/smarty/templates';
                 $smarty->setCompileDir($directory);
@@ -1428,7 +1429,8 @@ class Rechnung extends GenRechnung
                 'success' => $success,
                 'title' => 'Rechnung '.$result['kopf']['belegnr'],
                 'filename' => $filename,
-                'xml' => $output
+                'xml' => $output,
+                'template_name' => $template_name ?? ''
              ));
         } else {
             foreach ($headers as $header) {
@@ -1844,7 +1846,7 @@ class Rechnung extends GenRechnung
       $Brief = new Briefpapier($this->app);
       if($Brief->zuArchivieren($id, "rechnung"))
       {
-        if ($xmlrechnung) {
+        if ($xmlrechnung == 1) {
             $archiviere = "archivierexml";
         } else {
             $archiviere = "archivierepdf";
@@ -1891,8 +1893,10 @@ class Rechnung extends GenRechnung
       }
     }
 
-    if ($xmlrechnung) {
+    if ($xmlrechnung == 1) {
         $this->app->Tpl->Set('PDFVORSCHAUHIDDEN', "hidden");
+    } elseif ($xmlrechnung == 2) {
+        $this->app->Tpl->Add('MESSAGE', "<div class=\"info\"><strong>E-Rechnung (ZUGFeRD / Hybrid-PDF):</strong> Diese Rechnung enthält eingebettete XML-Daten (PDF/A-3). <a href=\"index.php?module=rechnung&action=xml&id=$id\" target=\"_blank\">[XML anzeigen]</a></div>");
     }
 
     $lieferdatum = '';
@@ -2457,7 +2461,7 @@ class Rechnung extends GenRechnung
                     $v
                   )
                 );
-                if($reArr['belegnr'] === '' || $reArr['xmlrechnung'] || ($reArr['open'] && $reArr['status'] === 'freigegeben')) {
+                if($reArr['belegnr'] === '' || $reArr['xmlrechnung'] == 1 || ($reArr['open'] && $reArr['status'] === 'freigegeben')) {
                   continue;
                 }
                 if($reArr['status'] === 'freigegeben') {
@@ -2488,7 +2492,7 @@ class Rechnung extends GenRechnung
             $tmpfile = [];
             foreach($auswahl as $v) {
               $xmlrechnung = $this->app->DB->Select("SELECT xmlrechnung FROM rechnung WHERE id=$v LIMIT 1");
-              if ($xmlrechnung) {
+              if ($xmlrechnung == 1) {
                 continue;
               }
               $projekt = $this->app->DB->Select("SELECT projekt FROM rechnung WHERE id=$v LIMIT 1");
@@ -2660,7 +2664,11 @@ class Rechnung extends GenRechnung
       if (!empty($adresse)) {
             // Check XML Smarty template
             if (!empty($this->GetXMLSmartyTemplate($id))) {
-                $this->app->DB->Update("UPDATE rechnung SET xmlrechnung = 1 WHERE id = '".$id."' AND schreibschutz <> 1");
+                // Default is 2 (ZUGFeRD / Hybrid-PDF with embedded XML)
+                // If explicitly configured as 'xml_only', use 1 (pure XML)
+                $format = $this->app->erp->Firmendaten('e_rechnung_format');
+                $val = ($format === 'xml_only') ? 1 : 2;
+                $this->app->DB->Update("UPDATE rechnung SET xmlrechnung = $val WHERE id = '".$id."' AND schreibschutz <> 1");
             }
         }
   }
