@@ -43,15 +43,9 @@ class RechnungPDF extends BriefpapierCustom {
     parent::__construct($this->app,$projekt,$styleData);
   }
 
-  public function GetRechnung($id, $titel_abw="",$doppeltmp=0, $_datum = null, $text_abw = '', $belegData = null)
+  public function GetRechnung($id, $titel_abw="",$doppeltmp=0, $_datum = null, $text_abw = '')
   {
-    if ($belegData === null && isset($this->app->erp) && method_exists($this->app->erp, 'GetBelegData')) {
-      try {
-        $belegData = $this->app->erp->GetBelegData('rechnung', (int)$id);
-      } catch (\Throwable $e) {
-        $belegData = null;
-      }
-    }
+    $belegData = $this->app->erp->GetBelegData('rechnung', (int)$id);
 
     if($this->app->erp->Firmendaten("steuerspalteausblenden")=="1")
     { 
