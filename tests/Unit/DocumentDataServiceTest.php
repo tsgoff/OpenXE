@@ -33,6 +33,8 @@ class DocumentDataServiceTest
         $this->testPrestoredDbNetSums();
         $this->testZeroRatedItems();
         $this->testAlexForumDiscrepancyCase();
+        $this->testUnitCodeMapping();
+        $this->testXRechnungTemplateRendering();
 
         echo "----------------------------------------------------\n";
         echo "Tests completed: {$this->passed} passed, {$this->failed} failed.\n";
@@ -264,6 +266,174 @@ class DocumentDataServiceTest
 
         // PDF summen_nach_steuersatz gives 5.69
         $this->assertEquals(5.69, $res['summen_nach_steuersatz']['19'], 'PDF prints 5.69, perfectly matching XML');
+    }
+
+    /**
+     * Scenario 8: Test UNECE Rec 20 Unit Code mapping.
+     */
+    public function testUnitCodeMapping()
+    {
+        echo "\nTest 8: UNECE Rec 20 Unit Code Mapping\n";
+
+        $this->assertEquals('C62', $this->service->determineUnitCode('Stk'), 'Stk -> C62');
+        $this->assertEquals('C62', $this->service->determineUnitCode('Stück'), 'Stück -> C62');
+        $this->assertEquals('HUR', $this->service->determineUnitCode('Std'), 'Std -> HUR');
+        $this->assertEquals('HUR', $this->service->determineUnitCode('Stunden'), 'Stunden -> HUR');
+        $this->assertEquals('KGM', $this->service->determineUnitCode('kg'), 'kg -> KGM');
+        $this->assertEquals('MTR', $this->service->determineUnitCode('m'), 'm -> MTR');
+        $this->assertEquals('XPP', $this->service->determineUnitCode('pauschal'), 'pauschal -> XPP');
+        $this->assertEquals('DAY', $this->service->determineUnitCode('Tage'), 'Tage -> DAY');
+        $this->assertEquals('LTR', $this->service->determineUnitCode('Liter'), 'Liter -> LTR');
+    }
+
+    /**
+     * Scenario 9: Test dynamic XRechnung Smarty template rendering.
+     */
+    public function testXRechnungTemplateRendering()
+    {
+        echo "\nTest 9: Dynamic XRechnung UBL Template Rendering\n";
+
+        require_once __DIR__ . '/../../vendor/smarty/smarty/libs/Smarty.class.php';
+
+        $kopf = [
+            'id' => 1,
+            'belegnr' => '400001',
+            'datum' => '2026-09-25',
+            'waehrung' => 'EUR',
+            'zahlungsweise' => 'rechnung',
+            'zahlungszieltage' => 14,
+            'payment_means_code' => '58',
+            'faelligkeitsdatum' => '2026-10-09',
+            'freifeld1' => '04011000-12345-67',
+            'ihrebestellnummer' => 'PO-9988',
+            'bearbeiter' => 'Max Mustermann',
+        ];
+
+        $rechnungssteller = [
+            'name' => 'OpenXE Tech GmbH',
+            'strasse' => 'Hauptstr. 1',
+            'plz' => '80331',
+            'ort' => 'Muenchen',
+            'land' => 'DE',
+            'steuernummer' => '143/123/45678',
+            'ustid' => 'DE987654321',
+            'iban' => 'DE89370400440532013000',
+            'bic' => 'BYLADEM1001',
+            'email' => 'rechnung@openxe-tech.de',
+            'telefon' => '+49 89 1234567',
+            'handelsregister' => 'HRB 123456',
+            'amtsgericht' => 'Amtsgericht Muenchen',
+        ];
+
+        $adresse = [
+            'name' => 'Kunden AG',
+            'strasse' => 'Kundenweg 2',
+            'plz' => '10115',
+            'ort' => 'Berlin',
+            'land' => 'DE',
+            'kundennummer' => 'KD10020',
+            'ustid' => 'DE112233445',
+            'leitwegid' => '04011000-12345-67',
+        ];
+
+        $bearbeiter = [
+            'name' => 'Mustermann',
+            'vorname' => 'Max',
+            'email' => 'm.mustermann@openxe-tech.de',
+            'telefon' => '+49 89 1234567-88',
+        ];
+
+        $positions = [
+            [
+                'id' => 1,
+                'menge' => 2,
+                'preis' => 50.00,
+                'rabatt' => 0,
+                'steuersatz' => 19.0,
+                'bezeichnung' => 'Entwicklung & Beratung',
+                'beschreibung' => 'Architekturberatung E-Rechnung',
+                'nummer' => 'ART-001',
+                'einheit' => 'Std',
+            ],
+            [
+                'id' => 2,
+                'menge' => 1,
+                'preis' => 25.00,
+                'rabatt' => 0,
+                'steuersatz' => 7.0,
+                'bezeichnung' => 'Fachbuch E-Invoicing',
+                'beschreibung' => 'Dokumentation',
+                'nummer' => 'ART-002',
+                'einheit' => 'Stk',
+                'ean' => '4012345678901',
+            ]
+        ];
+
+        $calculated = $this->service->calculateDocument('rechnung', $kopf, $positions, $adresse);
+
+        $data = [
+            'doctype' => 'rechnung',
+            'id' => 1,
+            'kopf' => $kopf,
+            'rechnungssteller' => $rechnungssteller,
+            'adresse' => $adresse,
+            'bearbeiter' => $bearbeiter,
+            'positionen' => $calculated['positionen'],
+            'steuern' => $calculated['steuern'],
+            'summen' => $calculated['summen'],
+        ];
+
+        $templatePath = __DIR__ . '/../../www/lib/rechnung/xrechnung_smarty_template.xml';
+        $template = file_get_contents($templatePath);
+
+        $smarty = new Smarty();
+        $tmpDir = sys_get_temp_dir() . '/smarty_unit_test_' . uniqid();
+        mkdir($tmpDir, 0777, true);
+        $smarty->setCompileDir($tmpDir);
+        $smarty->assign('rechnung', $data);
+
+        $xml = $smarty->fetch('string:' . $template);
+
+        // Check XML validity using DOMDocument
+        $dom = new DOMDocument();
+        $valid = $dom->loadXML($xml);
+        $this->assert($valid, 'Rendered XRechnung XML is well-formed XML');
+
+        // Check that no dummy placeholders remain
+        $dummies = ['info@musterfirma.de', '0123567890', 'DE12345678', 'HIER MANUELL'];
+        $foundDummy = false;
+        foreach ($dummies as $d) {
+            if (strpos($xml, $d) !== false) {
+                $foundDummy = true;
+            }
+        }
+        $this->assert(!$foundDummy, 'No hardcoded dummy placeholders in rendered XRechnung');
+
+        // Verify dynamic values in XML
+        $this->assert(strpos($xml, 'DE89370400440532013000') !== false, 'Contains dynamic IBAN');
+        $this->assert(strpos($xml, 'BYLADEM1001') !== false, 'Contains dynamic BIC');
+        $this->assert(strpos($xml, 'rechnung@openxe-tech.de') !== false, 'Contains dynamic supplier email');
+        $this->assert(strpos($xml, 'm.mustermann@openxe-tech.de') !== false, 'Contains dynamic clerk email');
+        $this->assert(strpos($xml, '04011000-12345-67') !== false, 'Contains Leitweg-ID');
+        $this->assert(strpos($xml, '4012345678901') !== false, 'Contains line item EAN');
+
+        // Verify totals and line units
+        $invoicedQuantities = $dom->getElementsByTagName('InvoicedQuantity');
+        $this->assertEquals('HUR', $invoicedQuantities->item(0)->getAttribute('unitCode'), 'Position 1 has unitCode HUR');
+        $this->assertEquals('C62', $invoicedQuantities->item(1)->getAttribute('unitCode'), 'Position 2 has unitCode C62');
+
+        $lineExtensionAmounts = $dom->getElementsByTagName('LineExtensionAmount');
+        $this->assertEquals('125.00', $lineExtensionAmounts->item(0)->nodeValue, 'LineExtensionAmount is 125.00');
+
+        $payableAmounts = $dom->getElementsByTagName('PayableAmount');
+        $this->assertEquals('145.75', $payableAmounts->item(0)->nodeValue, 'PayableAmount is 145.75');
+
+        // Clean up temp dir
+        $files = glob($tmpDir . '/*');
+        foreach ($files as $f) {
+            unlink($f);
+        }
+        rmdir($tmpDir);
     }
 }
 

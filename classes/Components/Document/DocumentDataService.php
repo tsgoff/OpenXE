@@ -73,6 +73,15 @@ class DocumentDataService
             $lieferschein = $this->app->DB->SelectRow("SELECT * FROM `lieferschein` WHERE `id` = " . (int)$kopf['lieferschein'] . " LIMIT 1") ?: [];
         }
 
+        // 4b. Fetch linked clerk / contact person (Bearbeiter)
+        $bearbeiter = [];
+        $bearbeiterId = (int)($kopf['bearbeiterid'] ?? 0);
+        if ($bearbeiterId > 0) {
+            $bearbeiter = $this->app->DB->SelectRow(
+                "SELECT id, name, vorname, email, telefon, telefax FROM `adresse` WHERE `id` = {$bearbeiterId} LIMIT 1"
+            ) ?: [];
+        }
+
         // Header additions for specific doctypes
         if ($doctype === 'rechnung') {
             $kopf['internet_bestellnummer'] = (string)$this->app->DB->Select(
@@ -80,11 +89,39 @@ class DocumentDataService
             );
         }
 
+        // Map payment means code according to UNCL4461
+        $zahlungsweise = strtolower(trim($kopf['zahlungsweise'] ?? ''));
+        $paymentMeansCode = '58'; // default: SEPA credit transfer
+        if (in_array($zahlungsweise, ['lastschrift', 'sepa_lastschrift', 'sepalastschrift', 'sepa'])) {
+            $paymentMeansCode = '59'; // SEPA direct debit
+        } elseif (in_array($zahlungsweise, ['kreditkarte', 'creditcard'])) {
+            $paymentMeansCode = '48';
+        } elseif ($zahlungsweise === 'paypal') {
+            $paymentMeansCode = '68';
+        } elseif (in_array($zahlungsweise, ['bar', 'cash'])) {
+            $paymentMeansCode = '10';
+        }
+        $kopf['payment_means_code'] = $paymentMeansCode;
+
+        // Calculate due date if available
+        if (!empty($kopf['datum']) && isset($kopf['zahlungszieltage']) && $kopf['zahlungszieltage'] !== '') {
+            $days = (int)$kopf['zahlungszieltage'];
+            $kopf['faelligkeitsdatum'] = date('Y-m-d', strtotime($kopf['datum'] . " + {$days} days"));
+        }
+
         // 5. Fetch positions
         $positionsTable = "{$doctype}_position";
-        $positions = $this->app->DB->SelectArr(
-            "SELECT * FROM `{$positionsTable}` WHERE `{$doctype}` = " . (int)$id . " ORDER BY sort ASC, id ASC"
-        ) ?: [];
+        $positions = [];
+        if ($doctype === 'rechnung' || $doctype === 'gutschrift' || $doctype === 'auftrag') {
+            $positions = $this->app->DB->SelectArr(
+                "SELECT p.*, IFNULL(p.ean, a.ean) AS ean FROM `{$positionsTable}` p LEFT JOIN `artikel` a ON a.id = p.artikel WHERE p.`{$doctype}` = " . (int)$id . " ORDER BY p.sort ASC, p.id ASC"
+            ) ?: [];
+        }
+        if (empty($positions)) {
+            $positions = $this->app->DB->SelectArr(
+                "SELECT * FROM `{$positionsTable}` WHERE `{$doctype}` = " . (int)$id . " ORDER BY sort ASC, id ASC"
+            ) ?: [];
+        }
 
         // 6. Calculate positions, taxes, and monetary totals using EN 16931 rules
         $calculated = $this->calculateDocument($doctype, $kopf, $positions, $adresse, $options);
@@ -96,6 +133,7 @@ class DocumentDataService
             'rechnungssteller' => $rechnungssteller,
             'kopf' => $kopf,
             'adresse' => $adresse,
+            'bearbeiter' => $bearbeiter,
             'auftrag' => $auftrag,
             'lieferschein' => $lieferschein,
             'positionen' => $calculated['positionen'],
@@ -189,6 +227,7 @@ class DocumentDataService
             $pos['steuertext'] = $steuertext;
             $pos['steuer_kategorie'] = $taxCategory;
             $pos['erloes'] = $erloes ?: ($pos['erloese'] ?? '');
+            $pos['unit_code'] = $this->determineUnitCode((string)($pos['einheit'] ?? ''));
             $pos['umsatz_netto_einzeln'] = $netPriceUnitRounded;
             $pos['umsatz_netto_gesamt'] = $lineNetAmount;
             $pos['umsatz_brutto_gesamt'] = $lineGrossAmount;
@@ -285,7 +324,17 @@ class DocumentDataService
     protected function determineTaxCategory(float $rate, array $pos, array $kopf, bool $taxExempt): string
     {
         if ($taxExempt) {
-            return 'E';
+            $ustBefreit = (int)($kopf['ust_befreit'] ?? ($pos['ust_befreit'] ?? 0));
+            if ($ustBefreit === 1 && !empty($kopf['ustid'])) {
+                return 'K'; // Intra-community supply (requires buyer VAT ID)
+            }
+            if ($ustBefreit === 2) {
+                return 'G'; // Export outside the EU
+            }
+            if ($ustBefreit === 3) {
+                return 'AE'; // VAT reverse charge
+            }
+            return 'E'; // Exempt from VAT
         }
 
         $posTaxType = strtolower(trim($pos['umsatzsteuer'] ?? ''));
@@ -298,6 +347,112 @@ class DocumentDataService
         }
 
         return 'Z';
+    }
+
+    /**
+     * Map OpenXE line unit (einheit) to UN/ECE Recommendation 20 unit code.
+     *
+     * @param string $einheit
+     * @return string
+     */
+    public function determineUnitCode(string $einheit): string
+    {
+        $e = strtolower(trim($einheit));
+        switch ($e) {
+            case 'std':
+            case 'stunde':
+            case 'stunden':
+            case 'h':
+            case 'hour':
+            case 'hours':
+            case 'hur':
+                return 'HUR';
+            case 'tag':
+            case 'tage':
+            case 'day':
+            case 'days':
+                return 'DAY';
+            case 'monat':
+            case 'monate':
+            case 'month':
+                return 'MON';
+            case 'jahr':
+            case 'jahre':
+                return 'ANN';
+            case 'kg':
+            case 'kilogramm':
+            case 'kilo':
+                return 'KGM';
+            case 'g':
+            case 'gramm':
+                return 'GRM';
+            case 't':
+            case 'tonne':
+            case 'tonnen':
+                return 'TNE';
+            case 'm':
+            case 'meter':
+            case 'lfm':
+                return 'MTR';
+            case 'mm':
+            case 'millimeter':
+                return 'MMT';
+            case 'cm':
+            case 'zentimeter':
+            case 'centimeter':
+                return 'CMT';
+            case 'km':
+            case 'kilometer':
+                return 'KMT';
+            case 'qm':
+            case 'm2':
+            case 'quadratmeter':
+                return 'MTK';
+            case 'cbm':
+            case 'm3':
+            case 'kubikmeter':
+                return 'MTQ';
+            case 'l':
+            case 'liter':
+                return 'LTR';
+            case 'ml':
+            case 'milliliter':
+                return 'MLT';
+            case 'pauschal':
+            case 'pauschale':
+            case 'psch':
+            case 'job':
+                return 'XPP';
+            case 'set':
+            case 'satz':
+                return 'SET';
+            case 'paket':
+            case 'pack':
+            case 'packung':
+            case 'pkg':
+                return 'XPK';
+            case 'flasche':
+            case 'flaschen':
+                return 'BO';
+            case 'karton':
+            case 'kiste':
+            case 'box':
+                return 'BX';
+            case 'palette':
+            case 'pal':
+                return 'PX';
+            case 'stk':
+            case 'stck':
+            case 'stück':
+            case 'stueck':
+            case 'stk.':
+            case 'piece':
+            case 'pieces':
+            case 'pcs':
+            case 'c62':
+            default:
+                return 'C62';
+        }
     }
 
     /**
@@ -315,7 +470,7 @@ class DocumentDataService
             'strasse' => (string)$erp->Firmendaten('strasse'),
             'ort' => (string)$erp->Firmendaten('ort'),
             'plz' => (string)$erp->Firmendaten('plz'),
-            'land' => (string)$erp->Firmendaten('land'),
+            'land' => (string)($erp->Firmendaten('land') ?: 'DE'),
             'steuernummer' => (string)$erp->Firmendaten('steuernummer'),
             'ustid' => (string)$erp->Firmendaten('ustid'),
             'bank' => (string)$erp->Firmendaten('bank'),
@@ -323,6 +478,11 @@ class DocumentDataService
             'bic' => (string)$erp->Firmendaten('swift'),
             'email' => (string)$erp->Firmendaten('email'),
             'telefon' => (string)$erp->Firmendaten('telefon'),
+            'telefax' => (string)$erp->Firmendaten('telefax'),
+            'handelsregister' => (string)$erp->Firmendaten('handelsregister'),
+            'amtsgericht' => (string)$erp->Firmendaten('amtsgericht'),
+            'gln' => (string)$erp->Firmendaten('gln'),
+            'leitwegid' => (string)$erp->Firmendaten('leitwegid'),
             'glaeubigeridentnr' => (string)$erp->Firmendaten('glaeubigeridentnr'),
         ];
     }
