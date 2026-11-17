@@ -957,7 +957,7 @@ class Systemlog {
     }
 
     ob_start();
-    phpinfo();
+    phpinfo(INFO_GENERAL | INFO_CONFIGURATION | INFO_MODULES);
     $phpinfo = ob_get_clean();
     
     $phpinfo = explode('<body>',$phpinfo,2);

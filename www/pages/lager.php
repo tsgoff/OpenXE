@@ -4436,7 +4436,7 @@ $check_charge=="2" || $check_charge=="1" || $check_mhd=="1")
       }
       if($cmd==='print')
       {
-        $data = unserialize($this->app->erp->base64_url_decode($data));
+        $data = unserialize($this->app->erp->base64_url_decode($data), ['allowed_classes' => false]);
 
         $arr = $this->app->DB->SelectArr("SELECT kurzbezeichnung,id FROM lager_platz WHERE kurzbezeichnung >='".$data['von']."' AND kurzbezeichnung<='".$data['bis']."' ORDER by kurzbezeichnung");
         if($data['etiketten']>0){

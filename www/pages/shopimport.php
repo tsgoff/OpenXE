@@ -392,7 +392,7 @@ class Shopimport {
                 if (isset($row['jsonencoded']) && $row['jsonencoded']) {
                     $warenkorb = json_decode(base64_decode($row['warenkorb']), true);
                 } else {
-                    $warenkorb = unserialize(base64_decode($row['warenkorb']));
+                    $warenkorb = unserialize(base64_decode($row['warenkorb']), ['allowed_classes' => false]);
                 }
                 $this->app->stringcleaner->XMLArray_clean($warenkorb);
 
@@ -408,7 +408,7 @@ class Shopimport {
             if ($this->app->DB->Select("SELECT id FROM shopimport_auftraege WHERE id='$more' AND jsonencoded = 1 LIMIT 1")) {
                 $warenkorb = json_decode(base64_decode($result), true);
             } else {
-                $warenkorb = unserialize(base64_decode($result));
+                $warenkorb = unserialize(base64_decode($result), ['allowed_classes' => false]);
             }
 
             ob_start();
@@ -971,7 +971,7 @@ class Shopimport {
         if (isset($shopImportedOrder['jsonencoded']) && $shopImportedOrder['jsonencoded']) {
             $shopOrder = json_decode(base64_decode($shopImportedOrder['warenkorb']), true);
         } else {
-            $shopOrder = unserialize(base64_decode($shopImportedOrder['warenkorb']));
+            $shopOrder = unserialize(base64_decode($shopImportedOrder['warenkorb']), ['allowed_classes' => false]);
         }
 
         //alle leerzeichen am amfang und ende entfernen + umbrueche komplett entfernen
@@ -1160,7 +1160,7 @@ class Shopimport {
                                 $tmpwarenkorb = json_decode(base64_decode($result[$i]['warenkorbjson']), true);
                             } else {
                                 $isjson = false;
-                                $tmpwarenkorb = unserialize(base64_decode($result[$i]['warenkorb']));
+                                $tmpwarenkorb = unserialize(base64_decode($result[$i]['warenkorb']), ['allowed_classes' => false]);
                             }
                             if (!empty($tmpwarenkorb['projekt']) && $this->app->DB->Select("SELECT id FROM projekt WHERE id = '" . (int) $tmpwarenkorb['projekt'] . "' LIMIT 1")) {
                                 $projekt = (int) $tmpwarenkorb['projekt'];
@@ -1360,7 +1360,7 @@ class Shopimport {
                                         $tmpwarenkorb = json_decode(base64_decode($cart['warenkorbjson']), true);
                                     } else {
                                         $isjson = false;
-                                        $tmpwarenkorb = unserialize(base64_decode($cart['warenkorb']));
+                                        $tmpwarenkorb = unserialize(base64_decode($cart['warenkorb']), ['allowed_classes' => false]);
                                     }
                                     $onlinebestellnummer = $tmpwarenkorb['onlinebestellnummer'];
                                     if (!empty($tmpwarenkorb['useorderid']) || (!is_numeric($onlinebestellnummer) && trim((String) $onlinebestellnummer) !== '')) {
@@ -1503,7 +1503,7 @@ class Shopimport {
         if (!empty($arr['jsonencoded'])) {
             $warenkorb = json_decode(base64_decode($arr['warenkorb']), true);
         } else {
-            $warenkorb = unserialize(base64_decode($arr['warenkorb']));
+            $warenkorb = unserialize(base64_decode($arr['warenkorb']), ['allowed_classes' => false]);
         }
         foreach ($warenkorb as $key => $value) {
             if (is_string($warenkorb[$key])) {
@@ -1618,7 +1618,7 @@ class Shopimport {
                     if (!empty($row['jsonencoded'])) {
                         $warenkorb = json_decode(base64_decode($row['warenkorb']), true);
                     } else {
-                        $warenkorb = unserialize(base64_decode($row['warenkorb']));
+                        $warenkorb = unserialize(base64_decode($row['warenkorb']), ['allowed_classes' => false]);
                     }
                     $this->app->DB->Update("UPDATE shopimport_auftraege set bestellnummer = '" . (isset($warenkorb['onlinebestellnummer']) ? $warenkorb['onlinebestellnummer'] : '') . "' where id = '" . $row['id'] . "'");
                 } else {
@@ -1668,7 +1668,7 @@ class Shopimport {
                 if (!empty($arr[$i]['jsonencoded'])) {
                     $warenkorb = json_decode(base64_decode($arr[$i]['warenkorb']), true);
                 } else {
-                    $warenkorb = unserialize(base64_decode($arr[$i]['warenkorb']));
+                    $warenkorb = unserialize(base64_decode($arr[$i]['warenkorb']), ['allowed_classes' => false]);
                 }
                 foreach ($warenkorb as $key => $value) {
                     if (is_string($warenkorb[$key])) {

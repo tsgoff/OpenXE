@@ -384,6 +384,9 @@ class SEPASDD {
      * @param $attr Key => Value array defining the attributes (Optional, default none)
      */
     public function addCustomNode($parent_XPATH, $name, $value = "", $attr = array() ){
+        if (!is_string($parent_XPATH) || !preg_match('/^[a-zA-Z0-9_\/\[\]=@\.\'\" -]+$/', $parent_XPATH)) {
+            throw new InvalidArgumentException("Invalid or unsafe XPATH expression: " . htmlspecialchars((string)$parent_XPATH));
+        }
         $xpath = new DOMXPath($this->xml);
         $parent = $xpath->query($parent_XPATH);
         if ( $parent == false || $parent->length == 0 ) {

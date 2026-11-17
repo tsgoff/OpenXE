@@ -30,8 +30,8 @@ class postbank
 		curl_setopt($page, CURLOPT_POSTFIELDS, $postData);
 		curl_setopt($page, CURLOPT_RETURNTRANSFER, 1);
 
-		curl_setopt($page, CURLOPT_SSL_VERIFYPEER, FALSE);
-		//curl_setopt($c, CURLOPT_SSL_VERIFYHOST, 2); 
+		curl_setopt($page, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($page, CURLOPT_SSL_VERIFYHOST, 2); 
 
 		curl_setopt($page, CURLOPT_COOKIEJAR, $cookie_file);
 

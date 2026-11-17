@@ -41,15 +41,16 @@ class SipgateResponse
      */
     public function dump($info = true)
     {
-        echo '<pre style="border: 5px solid #333;padding: 1em;float: left">';
+        if (PHP_SAPI !== 'cli') {
+            return;
+        }
         echo PHP_EOL;
-        var_dump($this->body);
+        print_r($this->body);
         echo PHP_EOL;
         if ($info) {
-            var_dump($this->info);
+            print_r($this->info);
             echo PHP_EOL;
         }
-        echo '</pre>';
     }
 
     /**

@@ -85,21 +85,16 @@ class KlarnaResponse
      */
     public function dump($info)
     {
-        $cli = PHP_SAPI === 'cli';
-        if (!$cli) {
-            echo '<pre>';
-            echo PHP_EOL;
+        if (PHP_SAPI !== 'cli') {
+            return;
         }
-        var_dump($this->result);
+        print_r($this->result);
         echo PHP_EOL;
         if ($info) {
-            var_dump($this->header);
+            print_r($this->header);
             echo PHP_EOL;
         } else {
-            var_dump('Status: ' . $this->status());
-        }
-        if (!$cli) {
-            echo '</pre>';
+            echo 'Status: ' . $this->status() . PHP_EOL;
         }
     }
 

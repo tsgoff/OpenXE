@@ -4960,8 +4960,8 @@ function AdresseBrief() {
               $pka = explode('_',$pk);
               if($pka[0] === 'datei' && isset($pka[1]) && $pka[1] && is_numeric($pka[1]))
               {
-                $dateiname = $this->app->erp->GetDateiName($pka[1]);
-                if($dateiname)
+                $dateiname = basename((string)$this->app->erp->GetDateiName($pka[1]));
+                if($dateiname !== '')
                 {
                   $dateiinhalt = $this->app->erp->GetDatei($pka[1]);
                   

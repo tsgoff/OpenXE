@@ -173,7 +173,8 @@ final class BackupService
             $this->logger->write('--BEGIN--');
 
             // DELETE OLD BACKUPS ON THE FILESYSTEM (BACKWARDS AS WELL)
-            exec(sprintf('cd %s && ls', $this->oFileBackup->getSnapshotsDir()), $asResult);
+            $snapshotsDir = $this->oFileBackup->getSnapshotsDir();
+            $asResult = is_dir($snapshotsDir) ? array_diff(scandir($snapshotsDir), ['.', '..']) : [];
             if (is_array($asResult) && count($asResult) > 0) {
                 foreach ($asResult as $file) {
                     if (!empty($file) && $file !== $filename) {
@@ -569,7 +570,7 @@ final class BackupService
                 $newDbPath = $userPath . $subdirectory . DIRECTORY_SEPARATOR . $dbName;
                 if (is_dir($userPath . $old_dbname) && !is_dir($userPath . $subdirectory)) {
                     $cmd = 'mv %s %s';
-                    @exec(sprintf($cmd, $oldDbPath, $newDbPath));
+                    @exec(sprintf($cmd, escapeshellarg($oldDbPath), escapeshellarg($newDbPath)));
                 }
             }
         }
@@ -590,7 +591,7 @@ final class BackupService
         if (!is_string($name)) {
             return false;
         }
-        exec(sprintf('whereis %s', $name), $out);
+        exec(sprintf('whereis %s', escapeshellarg($name)), $out);
         if (empty($out)) {
             return false;
         }

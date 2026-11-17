@@ -27,11 +27,14 @@ class DhlApi
   private const PRODUCTION_URL = 'https://cig.dhl.de/services/production/soap';
   private const NAMESPACE_CIS = 'http://dhl.de/webservice/cisbase';
 
-  public function __construct(string $user, string $signature)
+  public function __construct(string $user, string $signature, ?string $cigUser = null, ?string $cigPassword = null)
   {
+    $cigUser = $cigUser ?? (getenv('DHL_CIG_USER') ?: 'OpenXE_1');
+    $cigPassword = $cigPassword ?? (getenv('DHL_CIG_PASSWORD') ?: '');
+
     $this->soapClient = new SoapClient(__DIR__ . '/Wsdl/geschaeftskundenversand-api-3.4.0.wsdl', [
-      'login' => 'OpenXE_1',
-      'password' => 'cjzNEpGXxbbnRwcYLISX3ZTTcQrQrz',
+      'login' => $cigUser,
+      'password' => $cigPassword,
       'location' => self::PRODUCTION_URL,
       'trace' => 1,
       'connection_timeout' => 30,

@@ -64,7 +64,7 @@ $app->erp->SetKonfigurationValue('system_cronjob_max_execution_time', $max_execu
 $app->erp->SetKonfigurationValue('system_cronjob_php_ini_loaded_file', php_ini_loaded_file());
 $app->erp->SetKonfigurationValue('system_cronjob_get_current_user', get_current_user());
 ob_start();
-phpinfo();
+phpinfo(INFO_GENERAL | INFO_CONFIGURATION | INFO_MODULES);
 $phpinfo = ob_get_contents();
 ob_end_clean();
 $app->erp->SetKonfigurationValue('system_cronjob_phpinfo', $app->DB->real_escape_string($phpinfo));

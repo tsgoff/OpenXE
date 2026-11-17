@@ -202,7 +202,7 @@ class Shopimporter_Shopware6 extends ShopimporterBase
         }
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headerInformation);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
         if (curl_error($ch)) {
@@ -1542,7 +1542,7 @@ class Shopimporter_Shopware6 extends ShopimporterBase
             curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents($internalFile['dateipfad']));
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_HTTPHEADER, $setHeaders);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             $response = curl_exec($ch);
             if (curl_errno($ch) > 0 || curl_getinfo($ch, CURLINFO_HTTP_CODE) >= 400) {
@@ -3734,7 +3734,7 @@ class Shopimporter_Shopware6 extends ShopimporterBase
             curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents($filePath));
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
             curl_setopt($ch, CURLOPT_HTTPHEADER, $setHeaders);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             $response = json_decode(curl_exec($ch), true);
             curl_close($ch);

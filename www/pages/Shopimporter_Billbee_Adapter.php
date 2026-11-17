@@ -20,15 +20,18 @@
 class Shopimporter_Billbee_Adapter {
 
   protected $cURL;
+  protected $apiKey;
 
   /**
    * Shopimporter_Billbee_Adapter constructor.
    *
    * @param $user
    * @param $pass
+   * @param string $apiKey
    */
-  public function __construct($user, $pass) {
+  public function __construct($user, $pass, $apiKey = '') {
     $this->cURL = curl_init();
+    $this->apiKey = $apiKey ?: (getenv('BILLBEE_API_KEY') ?: '');
     curl_setopt($this->cURL, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'charset=utf-8'));
     curl_setopt($this->cURL, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($this->cURL, CURLOPT_FOLLOWLOCATION, false);
@@ -53,7 +56,10 @@ class Shopimporter_Billbee_Adapter {
     $headers = array(
       'Accept: application/json',
       'Content-Type: application/json',
-      'X-Billbee-Api-Key: FAE82830-B41C-4C41-9742-F8050B173110');
+    );
+    if (!empty($this->apiKey)) {
+      $headers[] = 'X-Billbee-Api-Key: ' . $this->apiKey;
+    }
 
     curl_setopt($this->cURL, CURLOPT_URL, $uri);
     curl_setopt($this->cURL, CURLOPT_HTTPHEADER, $headers);

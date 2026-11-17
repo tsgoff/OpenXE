@@ -23,11 +23,14 @@ class DhlApiFactory
         $senderCountry,
         $senderEmail
     ) {
+        $cigUser = getenv('DHL_CIG_USER') ?: 'wawision_2';
+        $cigPassword = getenv('DHL_CIG_PASSWORD') ?: '';
+
         return new DhlApi(
             $user,
             $pass,
-            'wawision_2',
-            'SQBKcoTz8GgOUp31VNyoZfWooSad3n',
+            $cigUser,
+            $cigPassword,
             $accountNumber,
             'https://cig.dhl.de/services/production/soap',
             $senderName,

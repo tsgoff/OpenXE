@@ -329,7 +329,8 @@ class USTID
     $ch = curl_init($url);
 
     curl_setopt_array($ch, array(
-      CURLOPT_SSL_VERIFYPEER => false,
+      CURLOPT_SSL_VERIFYPEER => true,
+      CURLOPT_SSL_VERIFYHOST => 2,
       CURLOPT_SSLVERSION => 6,
       CURLOPT_POST => false,
       CURLOPT_RETURNTRANSFER => true,

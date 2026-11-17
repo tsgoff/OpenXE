@@ -19,8 +19,10 @@ class GoApi {
     const BASE_URL_TEST = 'https://ws-tst.api.general-overnight.com/external/ci/order/api/v1/';
 
     protected string $baseUrl;
+    protected bool $testMode;
 
     public function __construct(protected LoggerInterface $logger, protected string $username, protected string $password, bool $testMode = true) {
+        $this->testMode = $testMode;
         if ($testMode)
             $this->baseUrl = self::BASE_URL_TEST;
         else
@@ -45,16 +47,16 @@ class GoApi {
            CURLOPT_POSTFIELDS => $json,
         ]);
 
-        if ($testmode) {
+        if ($this->testMode && getenv('ALLOW_INSECURE_GO_TEST_SSL') === '1') {
             curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
         }
 
         $response = json_decode(curl_exec($curl));
         $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
         $info = curl_getinfo($curl);
         $error = curl_error($curl);
+        curl_close($curl);
 
         $this->logger->debug('GO-API Create Order Response', ['response' => $response, 'code' => $code, 'curlerror' => $error, 'curlinfo' => $info]);
 

@@ -98,7 +98,7 @@
     if (!is_string($name)) {
       return false;
     }
-    exec(sprintf('whereis %s',$name), $out);
+    exec(sprintf('whereis %s', escapeshellarg($name)), $out);
     if (empty($out)) {
       return false;
     }
